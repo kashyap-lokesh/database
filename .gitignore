@@ -1,0 +1,44 @@
+# =========================
+# Build directories
+# =========================
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+compile_commands.json
+
+# =========================
+# Executables / binaries
+# =========================
+*.out
+*.exe
+*.o
+*.obj
+*.so
+*.a
+*.dylib
+mvcc-db
+
+# =========================
+# macOS specific
+# =========================
+.DS_Store
+
+# =========================
+# Editor / IDE files
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.swp
