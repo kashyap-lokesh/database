@@ -1,4 +1,6 @@
 #include "storage/table.h"
+
+#include <algorithm>
 #include <iostream>
 
 namespace mvcc
@@ -10,7 +12,6 @@ namespace mvcc
 
         if (it == rows_.end())
         {
-            // create row properly
             Row row(id);
             row.versions.emplace_back(txn_id, data);
             rows_.emplace(id, std::move(row));
@@ -21,18 +22,28 @@ namespace mvcc
         }
     }
 
-    std::string Table::read(int id, int txn_id)
+    std::string Table::read(
+        int id,
+        int txn_id,
+        const std::function<VersionVisibility(const Version &, int)> &visibility) const
     {
-        if (rows_.find(id) == rows_.end())
+        auto it = rows_.find(id);
+        if (it == rows_.end())
         {
             return "NOT_FOUND";
         }
 
-        auto &versions = rows_[id].versions;
-
-        if (!versions.empty())
+        for (auto vit = it->second.versions.rbegin(); vit != it->second.versions.rend(); ++vit)
         {
-            return versions.back().data;
+            const VersionVisibility state = visibility(*vit, txn_id);
+            if (state == VersionVisibility::VISIBLE)
+            {
+                return vit->data;
+            }
+            if (state == VersionVisibility::DELETED)
+            {
+                return "NOT_FOUND";
+            }
         }
 
         return "NOT_FOUND";
@@ -40,20 +51,61 @@ namespace mvcc
 
     void Table::update(int id, const std::string &data, int txn_id)
     {
-        if (rows_.find(id) == rows_.end())
+        auto it = rows_.find(id);
+        if (it == rows_.end())
+        {
             return;
+        }
 
-        rows_[id].versions.emplace_back(txn_id, data);
+        it->second.versions.emplace_back(txn_id, data);
     }
 
     void Table::remove(int id, int txn_id)
     {
-        if (rows_.find(id) == rows_.end())
-            return;
-
-        if (!rows_[id].versions.empty())
+        auto it = rows_.find(id);
+        if (it == rows_.end())
         {
-            rows_[id].versions.back().deleted_txn = txn_id;
+            return;
+        }
+
+        if (!it->second.versions.empty())
+        {
+            it->second.versions.back().deleted_txn = txn_id;
+        }
+    }
+
+    void Table::rollback(int txn_id)
+    {
+        for (auto row_it = rows_.begin(); row_it != rows_.end();)
+        {
+            auto &versions = row_it->second.versions;
+
+            versions.erase(
+                std::remove_if(
+                    versions.begin(),
+                    versions.end(),
+                    [txn_id](const Version &version)
+                    {
+                        return version.created_txn == txn_id;
+                    }),
+                versions.end());
+
+            for (auto &version : versions)
+            {
+                if (version.deleted_txn == txn_id)
+                {
+                    version.deleted_txn = -1;
+                }
+            }
+
+            if (versions.empty())
+            {
+                row_it = rows_.erase(row_it);
+            }
+            else
+            {
+                ++row_it;
+            }
         }
     }
 

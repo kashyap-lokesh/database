@@ -1,13 +1,16 @@
 #pragma once
 
-#include <string>
 #include <memory>
+#include <unordered_map>
+#include <string>
+
+#include "storage/version.h"
+#include "transaction/transaction.h"
 
 namespace mvcc
 {
 
     class Table;
-    class Transaction;
 
     class Engine
     {
@@ -27,8 +30,13 @@ namespace mvcc
         void printState() const;
 
     private:
+        VersionVisibility classifyVersion(const Version &version, int reader_txn_id) const;
+        const Transaction *findTransaction(int txn_id) const;
+
         std::unique_ptr<Table> table_;
+        std::unordered_map<int, Transaction> transactions_;
         int next_txn_id_;
+        int next_commit_ts_;
     };
 
 } // namespace mvcc
